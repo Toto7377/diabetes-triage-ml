@@ -45,14 +45,27 @@ jobs:
           docker logs svc || true
           docker rm -f svc
 
-      - name: Read metrics
+      - name: Read metrics from image
         id: metrics
+        shell: bash
         run: |
-          cid=$(docker create ${{ env.IMAGE }}:${{ env.VERSION }})
-          docker cp $cid:/app/artifacts/metrics_${{ env.VERSION }}.json ./metrics.json || true
-          docker rm $cid
-          echo "json=$(cat ./metrics.json 2>/dev/null || echo '{}')" >> $GITHUB_OUTPUT
+          set -e
+          cid=$(docker create "${{ env.IMAGE }}:${{ env.VERSION }}")
+          mkdir -p out
+          if docker cp "$cid:/app/artifacts/metrics_${{ env.VERSION }}.json" out/metrics.json 2>/dev/null; then
+            :
+          else
+            echo '{}' > out/metrics.json
+          fi
+          docker rm "$cid" >/dev/null
 
+          # Write multi-line JSON to step output correctly
+          {
+            echo 'json<<EOF'
+            cat out/metrics.json
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+           
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
