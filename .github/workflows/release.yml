@@ -1,23 +1,29 @@
 name: release
+
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*"]   # tag like v0.1, v0.2 to trigger
 
 jobs:
   build-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
-    env:
-      VERSION: ${{ github.ref_name }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      contents: write   # create GitHub Release
+      packages: write   # push to GHCR
+    defaults:
+      run:
+        shell: bash
 
-      - name: Set IMAGE env var (lowercase repo)
-        id: prep_image
-        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Compute lowercase image name and version safely (no expressions in env:)
+      - name: Compute env
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -39,37 +45,45 @@ jobs:
 
       - name: Smoke test container
         run: |
+          set -euo pipefail
           docker run -d -p 8000:8000 --name svc ${{ env.IMAGE }}:${{ env.VERSION }}
-          sleep 5
-          curl -f http://127.0.0.1:8000/health
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              echo "Healthcheck OK"; break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8000/health
           docker logs svc || true
           docker rm -f svc
 
+      # Extract metrics JSON from the image, minify it to ONE LINE, and export as a step output.
       - name: Read metrics from image
         id: metrics
-        shell: bash
         run: |
-          set -e
+          set -euo pipefail
           cid=$(docker create "${{ env.IMAGE }}:${{ env.VERSION }}")
           mkdir -p out
-          if docker cp "$cid:/app/artifacts/metrics_${{ env.VERSION }}.json" out/metrics.json 2>/dev/null; then
-            :
-          else
+          if ! docker cp "$cid:/app/artifacts/metrics_${{ env.VERSION }}.json" out/metrics.json 2>/dev/null; then
             echo '{}' > out/metrics.json
           fi
           docker rm "$cid" >/dev/null
 
-          # Write multi-line JSON to step output correctly
-          {
-            echo 'json<<EOF'
-            cat out/metrics.json
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
-           
+          # Minify JSON using a single-line python -c (no heredocs)
+          python -c "import json, pathlib; p=pathlib.Path('out/metrics.json'); s=p.read_text(encoding='utf-8'); obj=json.loads(s) if s.strip() else {}; open('out/min.json','w',encoding='utf-8').write(json.dumps(obj,separators=(',',':')))"
+          METRICS_MIN=$(cat out/min.json)
+
+          # Escape for GitHub file-command protocol
+          METRICS_ESC=${METRICS_MIN//'%'/'%25'}
+          METRICS_ESC=${METRICS_ESC//$'\n'/'%0A'}
+          METRICS_ESC=${METRICS_ESC//$'\r'/'%0D'}
+          echo "json=$METRICS_ESC" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ env.VERSION }}
+          tag_name: ${{ env.VERSION }}
           body: |
             Release ${{ env.VERSION }}
 
@@ -77,6 +91,5 @@ jobs:
             ```
             ${{ steps.metrics.outputs.json }}
             ```
-          tag_name: ${{ env.VERSION }}
           files: |
-            metrics.json
+            out/metrics.json
