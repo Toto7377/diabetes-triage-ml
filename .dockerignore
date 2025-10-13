@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+.git/
+.github/
+artifacts/        # force training inside the image, not from local files
+tests/__pycache__/

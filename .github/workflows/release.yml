@@ -1,0 +1,66 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }} # ghcr.io/<user>/<repo>
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Smoke test container
+        run: |
+          docker run -d -p 8000:8000 --name svc ${{ env.IMAGE }}:${{ env.VERSION }}
+          sleep 5
+          curl -f http://127.0.0.1:8000/health
+          docker logs svc || true
+          docker rm -f svc
+
+      - name: Read metrics
+        id: metrics
+        run: |
+          cid=$(docker create ${{ env.IMAGE }}:${{ env.VERSION }})
+          docker cp $cid:/app/artifacts/metrics_${{ env.VERSION }}.json ./metrics.json || true
+          docker rm $cid
+          echo "json=$(cat ./metrics.json 2>/dev/null || echo '{}')" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ env.VERSION }}
+          body: |
+            Release ${{ env.VERSION }}
+
+            Metrics:
+            ```
+            ${{ steps.metrics.outputs.json }}
+            ```
+          tag_name: ${{ env.VERSION }}
+          files: |
+            metrics.json
