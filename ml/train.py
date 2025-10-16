@@ -1,5 +1,6 @@
-# ml/train.py
-import json, time, sys
+import json
+import sys
+import time
 from pathlib import Path
 import numpy as np
 from joblib import dump
@@ -29,7 +30,8 @@ def train(version="v0.1"):
     rmse = mean_squared_error(yte, preds, squared=False)
 
     # save model
-    artifacts = Path("artifacts"); artifacts.mkdir(exist_ok=True)
+    artifacts = Path("artifacts")
+    artifacts.mkdir(exist_ok=True)
     model_path = artifacts / f"model_{version}.joblib"
     dump(pipe, model_path)
 
