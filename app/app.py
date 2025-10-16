@@ -7,11 +7,11 @@ from joblib import load
 import numpy as np
 from app.schema import PredictRequest, PredictResponse, HealthResponse, FEATURES
 
-APP_VERSION = os.getenv("APP_VERSION", "v0.1")
-MODEL_PATH = os.getenv("MODEL_PATH", f"artifacts/model_{APP_VERSION}.joblib")
-METRICS_PATH = os.getenv("METRICS_PATH", f"artifacts/metrics_{APP_VERSION}.json")
+VERSION = os.getenv("APP_VERSION", "v0.1")
+MODEL_PATH = Path("artifacts") / f"model_{VERSION}.joblib"
+METRICS_PATH = Path("artifacts") / f"metrics_{VERSION}.json"
 
-app = FastAPI(title="Diabetes Progression Scorer", version=APP_VERSION)  # <-- this must be named 'app'
+app = FastAPI(title="Diabetes Progression Scorer", version=VERSION)  # <-- this must be named 'app'
 
 if not Path(MODEL_PATH).exists():
     raise RuntimeError(f"Model not found at {MODEL_PATH}")
@@ -26,7 +26,7 @@ async def all_errors(request: Request, exc: Exception):
 
 @app.get("/health", response_model=HealthResponse)
 def health():
-    version = APP_VERSION
+    version = VERSION
     try:
         if Path(METRICS_PATH).exists():
             with open(METRICS_PATH) as f:
