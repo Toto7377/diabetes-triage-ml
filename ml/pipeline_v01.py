@@ -1,9 +1,11 @@
+from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LinearRegression
 
-def make_pipeline():
+def make_v01() -> Pipeline:
     return Pipeline([
         ("scaler", StandardScaler()),
         ("model", LinearRegression())
     ])
+
+make = make_v01
