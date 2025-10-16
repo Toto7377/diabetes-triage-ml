@@ -3,7 +3,9 @@ services:
     build:
       context: .
       args:
-        VERSION: v0.2
+        APP_VERSION: v0.2      
+    environment:
+      APP_VERSION: v0.2         
     container_name: diabetes-svc
     ports:
       - "8111:8000"
