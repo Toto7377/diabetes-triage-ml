@@ -1,7 +1,7 @@
 {
   "version": "v0.2",
   "rmse": 54.383837198342434,
-  "timestamp": 1760366375.7584064,
+  "timestamp": 1760607926.8765614,
   "seed": 42,
   "risk_threshold": 214.0,
   "precision_at_threshold": 0.8,

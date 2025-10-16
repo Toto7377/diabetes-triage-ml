@@ -10,5 +10,13 @@ def load_data():
     y = df["target"]
     return X, y
 
+
 def split(X, y, test_size=0.2):
-    return train_test_split(X, y, test_size=test_size, random_state=SEED, shuffle=True)
+    # Ensure reproducibility (fixed random_state)
+    return train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=SEED,  # this fixes the seed
+        shuffle=True         # ensures data is shuffled before splitting
+    )

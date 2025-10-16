@@ -1,3 +1,7 @@
+![CI](https://github.com/toto7377/diabetes-triage-ml/actions/workflows/ci.yml/badge.svg)
+![Release](https://github.com/toto7377/diabetes-triage-ml/actions/workflows/release.yml/badge.svg)
+
+
 # Diabetes Triage ML Service
 
 Predicts short-term diabetes progression (higher = worse) from the scikit-learn Diabetes dataset.  
@@ -19,5 +23,12 @@ python -m pip install -r requirements.txt
 python -m ml.train v0.1   
 python -m ml.train v0.2
 
-#start the API
+# Start the API
 uvicorn app.app:app --host 0.0.0.0 --port 8000
+
+# Run via Docker
+docker run -d -p 8000:8000 ghcr.io/toto7377/diabetes-triage-ml:v0.2
+
+# Docker compose (mapped to host port 8111)
+docker compose up -d
+# → http://127.0.0.1:8111/health

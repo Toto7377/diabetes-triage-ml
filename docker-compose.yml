@@ -1,0 +1,9 @@
+services:
+  diabetes-api:
+    build:
+      context: .
+      args:
+        APP_VERSION: v0.2
+    container_name: diabetes-svc
+    ports:
+      - "8111:8000"
