@@ -22,6 +22,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set IMAGE (lowercase)
+        id: image
+        run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"     # lower-case owner
+          REPO_LC="${GITHUB_REPOSITORY#*/}"           # repo (already lower-case)
+          echo "IMAGE=ghcr.io/${OWNER_LC}/${REPO_LC}" >> $GITHUB_ENV
+          echo "image=${OWNER_LC}/${REPO_LC}" >> $GITHUB_OUTPUT
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            APP_VERSION=${{ env.VERSION }}
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+
       - name: Set up QEMU (multi-arch)
         uses: docker/setup-qemu-action@v3
 
