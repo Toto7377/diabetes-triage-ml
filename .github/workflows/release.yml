@@ -2,33 +2,30 @@ name: release
 
 on:
   push:
-    tags: ['v*']   # tag like v0.1, v0.2 to trigger
+    tags: ['v*']  # e.g., v0.1, v0.2
 
 jobs:
-  build-publish:
+  release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write         # create GitHub Release
-      packages: write         # push to GHCR
-    defaults:
-      run:
-        shell: bash
-
+      contents: write   # create GitHub Release
+      packages: write   # push to GHCR
     env:
-      IMAGE: ghcr.io/${{ github.repository }}
       VERSION: ${{ github.ref_name }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set IMAGE (lowercase)
-        id: image
+      - name: Compute IMAGE (lowercase owner/repo)
+        id: img
+        shell: bash
         run: |
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"     # lower-case owner
-          REPO_LC="${GITHUB_REPOSITORY#*/}"           # repo (already lower-case)
-          echo "IMAGE=ghcr.io/${OWNER_LC}/${REPO_LC}" >> $GITHUB_ENV
-          echo "image=${OWNER_LC}/${REPO_LC}" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          REPO_LC="${GITHUB_REPOSITORY#*/}"
+          echo "IMAGE=ghcr.io/${OWNER_LC}/${REPO_LC}" >> "$GITHUB_ENV"
+          echo "image=${OWNER_LC}/${REPO_LC}" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -57,40 +54,16 @@ jobs:
           cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
 
-      - name: Set up QEMU (multi-arch)
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            APP_VERSION=${{ env.VERSION }}
-          tags: |
-            ${{ env.IMAGE }}:${{ env.VERSION }}
-            ${{ env.IMAGE }}:latest
-          # Optional registry cache (speeds up subsequent builds)
-          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
-
       - name: Smoke test container
+        shell: bash
+        env:
+          IMAGE: ${{ env.IMAGE }}
+          VERSION: ${{ env.VERSION }}
         run: |
           set -euo pipefail
-          docker run -d -p 8000:8000 --name svc "${IMAGE}:${VERSION}"
+          docker run -d --name svc -p 8000:8000 "${IMAGE}:${VERSION}"
+          # wait up to ~30s for /health
           for i in {1..30}; do
-            # fail fast if container died
             if ! docker ps --format '{{.Names}}' | grep -q '^svc$'; then
               echo "Container exited early"
               docker logs svc || true
@@ -106,30 +79,24 @@ jobs:
           docker logs svc || true
           docker rm -f svc
 
-      # Extract metrics JSON from the image (expects /app/artifacts/metrics_<version>.json)
       - name: Read metrics from image
         id: metrics
+        shell: bash
+        env:
+          IMAGE: ${{ env.IMAGE }}
+          VERSION: ${{ env.VERSION }}
         run: |
           set -euo pipefail
-          cid="$(docker create "${IMAGE}:${VERSION}")"
+          json="$(docker run --rm "${IMAGE}:${VERSION}" cat "/app/artifacts/metrics_${VERSION}.json")"
           mkdir -p out
-          if docker cp "${cid}:/app/artifacts/metrics_${VERSION}.json" out/metrics.json 2>/dev/null; then
-            echo "Found metrics file"
-          else
-            echo "{}" > out/metrics.json
-          fi
-          docker rm "$cid" >/dev/null
+          printf '%s\n' "$json" > out/metrics.json
 
-          # Minify JSON to one line and expose as step output
-          python - << 'PY'
-          import json, pathlib
-          p = pathlib.Path('out/metrics.json')
-          try:
-              obj = json.loads(p.read_text(encoding='utf-8'))
-          except Exception:
-              obj = {}
-          print(f"json={json.dumps(obj, separators=(',',':'))}")
-          PY >> "$GITHUB_OUTPUT"
+          # Expose pretty JSON as a multi-line step output
+          {
+            echo 'json<<EOF'
+            cat out/metrics.json
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -137,9 +104,13 @@ jobs:
           name: ${{ env.VERSION }}
           tag_name: ${{ env.VERSION }}
           body: |
-            Release ${{ env.VERSION }}
+            Release **${{ env.VERSION }}**
 
-            Metrics:
+            **Image**
+            - `ghcr.io/${{ steps.img.outputs.image }}:${{ env.VERSION }}`
+            - `ghcr.io/${{ steps.img.outputs.image }}:latest`
+
+            **Metrics**
             ```
             ${{ steps.metrics.outputs.json }}
             ```
