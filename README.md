@@ -1,4 +1,4 @@
-![CI](https://github.com/toto7377/diabetes-triage-ml/actions/workflows/ci.yml/badge.svg?branch=main)
+![CI](https://github.com/toto7377/diabetes-triage-ml/actions/workflows/ci.yml/badge.svg?branch=v0.2)
 ![Release](https://github.com/toto7377/diabetes-triage-ml/actions/workflows/release.yml/badge.svg?branch=v0.2)
 
 
