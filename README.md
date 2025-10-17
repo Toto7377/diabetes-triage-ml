@@ -1,5 +1,6 @@
-[![CI](https://img.shields.io/github/actions/workflow/status/toto7377/diabetes-triage-ml/ci.yml?branch=main&logo=github&label=ci)](https://github.com/toto7377/diabetes-triage-ml/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/actions/workflow/status/toto7377/diabetes-triage-ml/release.yml?branch=v0.2&logo=github&label=release)](https://github.com/toto7377/diabetes-triage-ml/actions/workflows/release.yml)
+![CI](https://github.com/toto7377/diabetes-triage-ml/actions/workflows/ci.yml/badge.svg?branch=main)
+![Release](https://github.com/toto7377/diabetes-triage-ml/actions/workflows/release.yml/badge.svg?branch=v0.2)
+
 
 # Diabetes Triage ML Service
 
